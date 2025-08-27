@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>.podc</title>
+
+  <!-- tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink: '#222323',
+            paper: '#f0f6f0',
+          },
+          boxShadow: {
+            'pixel': '0 0 0 2px var(--ink) inset',
+          },
+          fontFamily: {
+            pixel: ['"Press Start 2P"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <script>
+    (function(){
+      try { if(localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark'); } catch(e){}
+    })();
+  </script>
+
+  <style>
+
+    :root { --ink:#222323; --paper:#f0f6f0; }
+    html.dark { --ink:#f0f6f0; --paper:#222323; color-scheme: dark; }
+    html, body { background: var(--paper); color: var(--ink); }
+
+    .onebit-bg { background: var(--paper); color: var(--ink); }
+    .onebit-border { border: 2px solid var(--ink); }
+    .onebit-inset { box-shadow: inset 0 0 0 2px var(--ink); }
+    .onebit-outline { box-shadow: 0 0 0 2px var(--ink); }
+    .onebit-divider { border-top: 2px dashed var(--ink); }
+
+    .pixel-btn { image-rendering: pixelated; letter-spacing: .5px; transition: transform 80ms ease; }
+    .pixel-btn:active { transform: translateY(1px); }
+    .badge { border: 2px solid currentColor; padding: 2px 6px; font-size: 10px; text-transform: uppercase; }
+    .kbd { border: 2px solid currentColor; padding: 1px 4px; font-size: 10px; }
+
+
+    * { scrollbar-width: thin; scrollbar-color: var(--ink) var(--paper); }
+
+
+    .icon-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid currentColor; background: transparent; }
+    .icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+
+
+    .dragging { opacity: .6; }
+    .drop-target { outline: 2px dashed currentColor; outline-offset: -4px; }
+
+
+    .exporting-pdf .hide-when-export { display: none !important; }
+
+
+    .tip { position: relative; }
+    .tip:hover::after { content: attr(aria-label); position:absolute; left: 50%; transform: translateX(-50%);
+      bottom: calc(100% + 8px); white-space: nowrap; background: var(--ink); color: var(--paper);
+      border: 2px solid var(--paper); padding: 4px 6px; font-size: 10px; z-index: 50; }
+
+
+    .onebit-input, .onebit-select, .onebit-textarea { background: transparent; border: 2px solid currentColor; padding: 8px; }
+    .onebit-textarea { min-height: 96px; }
+
+
+    #board { background: inherit; }
+  </style>
+</head>
+<body class="min-h-screen font-mono onebit-bg">
+  <header class="sticky top-0 z-40 onebit-bg border-b-2 onebit-border border-b-0">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="text-2xl md:text-3xl font-pixel tracking-tight select-none">.podc</div>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="themeBtn" class="pixel-btn px-3 py-2 onebit-border" aria-label="Alternar tema">tema</button>
+        <button id="helpBtn" class="pixel-btn px-3 py-2 onebit-border">ajuda</button>
+        <div class="w-px h-6 onebit-border"></div>
+        <button id="exportJsonBtn" class="pixel-btn px-3 py-2 onebit-border">exportar .json</button>
+        <label for="importJsonInput" class="pixel-btn px-3 py-2 onebit-border cursor-pointer">importar .json</label>
+        <input id="importJsonInput" type="file" accept="application/json" class="hidden" />
+        <div class="w-px h-6 onebit-border"></div>
+        <button id="exportPdfBtn" class="pixel-btn px-3 py-2 onebit-border">exportar .pdf</button>
+        <button id="resetBtn" class="pixel-btn px-3 py-2 onebit-border">resetar</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-4">
+    <section id="board" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+
+    </section>
+  </main>
+
+
+  <dialog id="cardModal" class="onebit-bg onebit-border p-0 w-[min(680px,92vw)]">
+    <form id="cardForm" class="p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 id="cardModalTitle" class="font-pixel text-lg">novo cartão</h2>
+        <button type="button" class="pixel-btn px-2 py-1 onebit-border" onclick="closeCardModal()">fechar</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs uppercase">título</span>
+          <input id="fTitle" class="onebit-input" maxlength="120" required />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs uppercase">tipo</span>
+          <select id="fType" class="onebit-select">
+            <option value="kpi">kpi</option>
+            <option value="informativo">informativo</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 md:col-span-2">
+          <span class="text-xs uppercase">notas</span>
+          <textarea id="fNotes" class="onebit-textarea" placeholder="contexto, detalhes, links (cole o texto aqui)"></textarea>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs uppercase">prioridade</span>
+          <select id="fPriority" class="onebit-select">
+            <option value="baixa">baixa</option>
+            <option value="média">média</option>
+            <option value="alta">alta</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs uppercase">entrega</span>
+          <input id="fDue" type="date" class="onebit-input"/>
+        </label>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="submit" class="pixel-btn px-3 py-2 onebit-border">salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="helpModal" class="onebit-bg onebit-border p-0 w-[min(880px,96vw)]">
+    <div class="p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-pixel text-lg">ajuda & estrutura do .json</h2>
+        <button type="button" class="pixel-btn px-2 py-1 onebit-border" onclick="document.getElementById('helpModal').close()">fechar</button>
+      </div>
+      <p class="text-sm leading-relaxed">esta aplicação salva localmente (localStorage) e permite exportar/importar um <span class="kbd">.json</span> com todo o estado do kanban. abaixo, um exemplo reduzido, com explicação de cada parte.</p>
+      <pre class="onebit-border p-3 overflow-auto text-xs leading-6"><code>{
+  "version": 1,
+  "theme": "light" | "dark", // tema atual
+  "updatedAt": "2025-08-27T12:34:56.789Z", // último salvamento
+  "columns": [
+    {
+      "key": "planejar", // id fixo da coluna
+      "title": "planejar",
+      "summary": "metas, objetivos e planos",
+      "cards": [
+        {
+          "id": "c_171...",        // id único do cartão
+          "type": "kpi"|"informativo",
+          "title": "texto curto",
+          "notes": "texto livre para contexto",
+          "priority": "baixa"|"média"|"alta",
+          "due": "2025-09-30",     // opcional (yyyy-mm-dd)
+          "createdAt": "2025-08-27T..."
+        }
+      ]
+    }, { /* organizar */ }, { /* dirigir */ }, { /* controlar */ }
+  ]
+}</code></pre>
+      <ul class="list-disc pl-6 text-sm">
+        <li><b>columns</b>: a ordem no array define a ordem visual das colunas.</li>
+        <li><b>cards</b>: a ordem define a posição vertical (de cima para baixo).</li>
+        <li><b>priority</b>: apenas baixa/média/alta — mantemos estética one‑bit sem cores extras.</li>
+        <li><b>edição</b>: você pode editar o .json e importar novamente para refletir mudanças.</li>
+      </ul>
+    </div>
+  </dialog>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <script>
+
+  const STORAGE_KEY = 'podc_state_v1';
+  const DEFAULT_COLUMNS = [
+    { key:'planejar', title:'planejar', summary:'metas, objetivos e planos', cards:[] },
+    { key:'organizar', title:'organizar', summary:'recursos, estrutura, equipe', cards:[] },
+    { key:'dirigir',   title:'dirigir',   summary:'liderança, execução', cards:[] },
+    { key:'controlar', title:'controlar', summary:'monitoramento, ajustes', cards:[] },
+  ];
+
+  const state = loadState();
+
+  function loadState(){
+    let parsed;
+    try { parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch(e){ parsed = null; }
+    if(!parsed || !Array.isArray(parsed.columns)){
+      parsed = { version:1, theme: (localStorage.getItem('theme')||'light'), updatedAt: new Date().toISOString(), columns: DEFAULT_COLUMNS };
+    }
+    setTheme(parsed.theme);
+    return parsed;
+  }
+
+  function saveState(){
+    state.updatedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function setTheme(mode){
+    const html = document.documentElement;
+    html.classList.toggle('dark', mode === 'dark');
+    localStorage.setItem('theme', mode);
+  }
+
+ 
+  const boardEl = document.getElementById('board');
+
+  function render(){
+    boardEl.innerHTML = '';
+    state.columns.forEach(col => {
+      boardEl.appendChild(renderColumn(col));
+    });
+  }
+
+  function renderColumn(col){
+    const section = el('section', 'flex flex-col onebit-border p-3 gap-3');
+    const head = el('div', 'space-y-2');
+    const titleRow = el('div', 'grid grid-cols-[1fr_auto] items-start gap-2 relative');
+    const h = el('h2', 'font-pixel text-base md:text-lg uppercase tracking-wide leading-none'); h.textContent = col.title;
+    const addBtn = el('button', 'pixel-btn px-2 py-1 onebit-border hide-when-export col-start-2 row-start-1 self-start text-xs leading-none whitespace-nowrap');
+    addBtn.textContent = '+ cartão';
+    addBtn.addEventListener('click', () => openCardModal({ mode:'create', columnKey: col.key }));
+    titleRow.append(h, addBtn);
+
+    const summary = el('p', 'text-xs md:text-sm opacity-80');
+    summary.textContent = getSummary(col.key);
+
+    head.append(titleRow, summary, el('div', 'onebit-divider'));
+
+    const list = el('div', 'flex-1 min-h-[120px] space-y-3');
+    list.dataset.columnKey = col.key;
+    list.addEventListener('dragover', (e)=>{ e.preventDefault(); list.classList.add('drop-target'); });
+    list.addEventListener('dragleave', ()=> list.classList.remove('drop-target'));
+    list.addEventListener('drop', (e)=>{
+      e.preventDefault(); list.classList.remove('drop-target');
+      const payload = JSON.parse(e.dataTransfer.getData('application/json')||'{}');
+      if(payload && payload.id){ moveCard(payload.from, col.key, payload.id); }
+    });
+
+    col.cards.forEach(card => list.appendChild(renderCard(col.key, card)));
+
+    section.append(head, list);
+    return section;
+  }
+
+  function getSummary(key){
+    const map = {
+      planejar: 'metas, objetivos e planos',
+      organizar: 'recursos, estrutura, equipe',
+      dirigir: 'liderança, execução',
+      controlar: 'monitoramento, ajustes'
+    };
+    return map[key] || '';
+  }
+
+  function renderCard(columnKey, card){
+    const wrapper = el('article', 'onebit-border p-3 space-y-2 bg-transparent overflow-hidden');
+    wrapper.draggable = true;
+    wrapper.addEventListener('dragstart', (e)=>{
+      wrapper.classList.add('dragging');
+      e.dataTransfer.setData('application/json', JSON.stringify({ from: columnKey, id: card.id }));
+    });
+    wrapper.addEventListener('dragend', ()=> wrapper.classList.remove('dragging'));
+
+    const top = el('div', 'flex items-center justify-between gap-2');
+    const left = el('div', 'flex items-center gap-2');
+    const type = el('span', 'badge');
+    type.textContent = card.type;
+
+    const prio = el('span', 'text-xs');
+    prio.textContent = prioLabel(card.priority);
+
+    left.append(type, prio);
+
+    const menu = el('div', 'flex items-center gap-1 hide-when-export');
+    const editBtn = iconBtn('edit','editar', ()=> openCardModal({ mode:'edit', columnKey, card }));
+    const dupBtn = iconBtn('copy','duplicar', ()=> duplicateCard(columnKey, card.id));
+    const delBtn = iconBtn('trash','excluir', ()=> { if(confirm('Excluir cartão?')) deleteCard(columnKey, card.id); });
+    menu.append(editBtn, dupBtn, delBtn);
+
+    const title = el('h3', 'font-semibold uppercase'); title.textContent = card.title;
+    const notes = el('p', 'text-sm whitespace-pre-wrap break-words'); notes.textContent = card.notes || '';
+
+    const metaRow = el('div', 'flex items-center justify-between text-xs opacity-80');
+    const due = el('span'); due.textContent = card.due ? `entrega: ${card.due}` : '';
+    const created = el('span'); created.textContent = new Date(card.createdAt).toLocaleDateString();
+
+    top.append(left, menu);
+    metaRow.append(due, created);
+    wrapper.append(top, title, notes, metaRow);
+    return wrapper;
+  }
+
+  function prioLabel(p){
+    if(p==='alta') return 'alta';
+    if(p==='média') return 'média';
+    return 'baixa';
+  }
+
+
+  function byKey(key){ return state.columns.find(c=>c.key===key); }
+
+  function addCard(columnKey, data){
+    const col = byKey(columnKey); if(!col) return;
+    const card = {
+      id: 'c_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36),
+      type: data.type || 'informativo',
+      title: data.title || '(sem título)',
+      notes: data.notes || '',
+      priority: data.priority || 'baixa',
+      due: data.due || '',
+      createdAt: new Date().toISOString(),
+    };
+    col.cards.push(card);
+    saveState();
+    render();
+  }
+
+  function updateCard(columnKey, cardId, updates){
+    const col = byKey(columnKey); if(!col) return;
+    const idx = col.cards.findIndex(c=>c.id===cardId); if(idx<0) return;
+    col.cards[idx] = { ...col.cards[idx], ...updates };
+    saveState(); render();
+  }
+
+  function deleteCard(columnKey, cardId){
+    const col = byKey(columnKey); if(!col) return;
+    col.cards = col.cards.filter(c=>c.id!==cardId);
+    saveState(); render();
+  }
+
+  function duplicateCard(columnKey, cardId){
+    const col = byKey(columnKey); if(!col) return;
+    const src = col.cards.find(c=>c.id===cardId); if(!src) return;
+    const copy = { ...src, id:'c_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36), createdAt:new Date().toISOString() };
+    col.cards.push(copy);
+    saveState(); render();
+  }
+
+  function moveCard(fromKey, toKey, cardId){
+    if(!fromKey || !toKey || !cardId) return;
+    const from = byKey(fromKey), to = byKey(toKey); if(!from || !to) return;
+    const idx = from.cards.findIndex(c=>c.id===cardId); if(idx<0) return;
+    const [card] = from.cards.splice(idx,1);
+    to.cards.push(card); // adiciona ao final
+    saveState(); render();
+  }
+
+
+  let modalState = { mode:'create', columnKey:null, card:null };
+  const cardModal = document.getElementById('cardModal');
+  const cardForm  = document.getElementById('cardForm');
+
+  function openCardModal({ mode, columnKey, card }){
+    modalState = { mode, columnKey, card };
+    document.getElementById('cardModalTitle').textContent = mode==='edit' ? 'editar cartão' : 'novo cartão';
+    document.getElementById('fTitle').value = card?.title || '';
+    document.getElementById('fType').value = card?.type || 'informativo';
+    document.getElementById('fNotes').value = card?.notes || '';
+    document.getElementById('fPriority').value = card?.priority || 'baixa';
+    document.getElementById('fDue').value = card?.due || '';
+    cardModal.showModal();
+  }
+  function closeCardModal(){ cardModal.close(); }
+
+  cardForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const data = {
+      title: document.getElementById('fTitle').value.trim(),
+      type: document.getElementById('fType').value,
+      notes: document.getElementById('fNotes').value,
+      priority: document.getElementById('fPriority').value,
+      due: document.getElementById('fDue').value,
+    };
+    if(modalState.mode==='edit' && modalState.card){
+      updateCard(modalState.columnKey, modalState.card.id, data);
+    } else if(modalState.mode==='create'){
+      addCard(modalState.columnKey, data);
+    }
+    closeCardModal();
+  });
+
+  document.getElementById('themeBtn').addEventListener('click', ()=>{
+    const next = (localStorage.getItem('theme')||'light') === 'light' ? 'dark' : 'light';
+    state.theme = next; setTheme(next); saveState();
+  });
+
+  document.getElementById('helpBtn').addEventListener('click', ()=>{
+    document.getElementById('helpModal').showModal();
+  });
+
+  document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'podc-board.json'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importJsonInput').addEventListener('change', (e)=>{
+    const file = e.target.files?.[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if(!Array.isArray(data.columns)) throw new Error('formato inválido: columns ausente');
+        state.version = data.version || 1;
+        state.theme = data.theme || (localStorage.getItem('theme')||'light');
+        state.columns = normalizeColumns(data.columns);
+        saveState(); setTheme(state.theme); render();
+        alert('kanban importado com sucesso.');
+      } catch(err){ alert('falha ao importar: '+ err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(!confirm('restaurar o kanban para o estado inicial? isso removerá todos os cartões.')) return;
+    state.columns = DEFAULT_COLUMNS.map(c=>({ ...c, cards:[] }));
+    saveState(); render();
+  });
+
+
+  document.getElementById('exportPdfBtn').addEventListener('click', exportPDF);
+
+  async function exportPDF(){
+    const { jsPDF } = window.jspdf;
+    const board = document.getElementById('board');
+
+
+    document.body.classList.add('exporting-pdf');
+    await tick();
+
+    const scale = 2; 
+    const canvas = await html2canvas(board, { scale, backgroundColor: null, useCORS: true });
+
+    document.body.classList.remove('exporting-pdf');
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('landscape', 'pt', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const imgW = pageWidth;
+    const ratio = imgW / canvas.width;
+    const imgH = canvas.height * ratio;
+
+    if(imgH <= pageHeight){
+      pdf.addImage(imgData, 'PNG', 0, 0, imgW, imgH, undefined, 'FAST');
+    } else {
+      const pageCanvas = document.createElement('canvas');
+      const ctx = pageCanvas.getContext('2d');
+      pageCanvas.width = canvas.width;
+      const pageHeightPx = pageHeight / ratio;
+      let rendered = 0;
+      while(rendered < canvas.height){
+        const sliceHeight = Math.min(pageHeightPx, canvas.height - rendered);
+        pageCanvas.height = sliceHeight;
+        ctx.clearRect(0,0,pageCanvas.width,pageCanvas.height);
+        ctx.drawImage(canvas, 0, rendered, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+        const sliceData = pageCanvas.toDataURL('image/png');
+        if(rendered>0) pdf.addPage('a4', 'landscape');
+        pdf.addImage(sliceData, 'PNG', 0, 0, imgW, sliceHeight * ratio, undefined, 'FAST');
+        rendered += sliceHeight;
+      }
+    }
+
+    pdf.save('.podc-kanban.pdf');
+  }
+
+  function tick(){ return new Promise(r=>setTimeout(r,0)); }
+
+  function normalizeColumns(cols){
+    const order = ['planejar','organizar','dirigir','controlar'];
+    const by = Object.fromEntries(cols.map(c=>[c.key, c]));
+    return order.map(k=>({
+      key: k,
+      title: by[k]?.title || k,
+      summary: getSummary(k),
+      cards: Array.isArray(by[k]?.cards) ? by[k].cards.map(normalizeCard) : []
+    }));
+  }
+  function normalizeCard(c){
+    return {
+      id: c.id || 'c_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36),
+      type: (c.type==='kpi'||c.type==='informativo')?c.type:'informativo',
+      title: (c.title||'').toString().slice(0,120),
+      notes: (c.notes||'').toString(),
+      priority: (['baixa','média','alta'].includes(c.priority)?c.priority:'baixa'),
+      due: (c.due||'').toString().slice(0,10),
+      createdAt: c.createdAt || new Date().toISOString(),
+    }
+  }
+
+  function el(tag, classes){ const x = document.createElement(tag); if(classes) x.className = classes; return x; }
+  function iconBtn(name, label, onClick){
+    const b = el('button','icon-btn tip');
+    b.setAttribute('aria-label', label);
+    b.innerHTML = iconSvg(name);
+    b.type='button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function iconSvg(name){
+    if(name==='edit') return '<svg viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16v4z"></path><path d="M14 6l4 4"></path></svg>';
+    if(name==='copy') return '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11"></rect><rect x="4" y="4" width="11" height="11"></rect></svg>';
+    if(name==='trash') return '<svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 7v13h10V7"></path><path d="M9 7V4h6v3"></path></svg>';
+    return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle></svg>';
+  }
+
+  render();
+
+  boardEl.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.target.closest('[data-column-key]')){
+      const key = e.target.closest('[data-column-key]').dataset.columnKey;
+      openCardModal({ mode:'create', columnKey: key });
+    }
+  });
+  </script>
+</body>
+</html>
